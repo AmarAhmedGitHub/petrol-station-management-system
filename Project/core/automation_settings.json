@@ -1,0 +1,5 @@
+{
+    "RECONCILIATION_INTERVAL_HOURS": 7.5,
+    "AUTOMATION_ENABLED": true,
+    "FALLBACK_TO_MOCK": true
+}
