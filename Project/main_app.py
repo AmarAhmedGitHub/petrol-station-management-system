@@ -7,7 +7,7 @@ Fuel Station Management System - Unified Main Application
 
 import streamlit as st
 from pages.auth.login import main as auth_main
-from core.database_enhanced import create_enhanced_tables
+from core.database_enhanced import create_enhanced_tables, check_tables_exist
 from core.automation import start_scheduler
 from core.sensor_api import initialize_sensor_api
 from core.design_system import get_full_css
@@ -29,7 +29,10 @@ def initialize_application():
         st.session_state.current_page = 'dashboard'
 
     # Create database tables if they don't exist
-    create_enhanced_tables()
+    if not check_tables_exist():
+        create_enhanced_tables()
+    else:
+        print("✅ Database tables already exist, skipping creation")
 
     # Initialize sensor API and automation scheduler (only once)
     if 'automation_initialized' not in st.session_state:

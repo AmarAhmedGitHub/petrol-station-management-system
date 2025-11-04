@@ -835,10 +835,36 @@ def get_all_stations():
         return []
 
 @st.cache_data(ttl=300)
+def check_tables_exist():
+    """Check if essential tables exist in the database"""
+    try:
+        conn = get_connection()
+        if conn is None:
+            return False
+        with conn:
+            c = conn.cursor()
+            # Check for essential tables
+            c.execute("SHOW TABLES LIKE 'FuelTypes'")
+            fuel_types_exists = c.fetchone() is not None
+
+            c.execute("SHOW TABLES LIKE 'Employees'")
+            employees_exists = c.fetchone() is not None
+
+            c.execute("SHOW TABLES LIKE 'PetrolStations'")
+            stations_exists = c.fetchone() is not None
+
+            return fuel_types_exists and employees_exists and stations_exists
+    except Exception as e:
+        logger.error(f"Error checking tables existence: {e}")
+        return False
+
 def get_all_fuel_types():
     """Get all active fuel types"""
     try:
-        with get_connection() as conn:
+        conn = get_connection()
+        if conn is None:
+            return []
+        with conn:
             c = conn.cursor()
             c.execute('SELECT * FROM FuelTypes WHERE Is_Active = TRUE ORDER BY FuelType_Name')
             data = c.fetchall()
@@ -846,7 +872,10 @@ def get_all_fuel_types():
             return data
     except Exception as e:
         logger.error(f"Error retrieving fuel types: {e}")
-        st.error(f"خطأ في استرجاع أنواع الوقود: {e}")
+        # Don't show error in Streamlit Cloud
+        import os
+        if not os.getenv("STREAMLIT_SERVER_HEADLESS", "").lower() == "true":
+            st.error(f"خطأ في استرجاع أنواع الوقود: {e}")
         return []
 
 @st.cache_data(ttl=300)
