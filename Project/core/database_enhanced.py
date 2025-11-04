@@ -801,7 +801,11 @@ def add_petrol_station(Station_ID, Station_Name, Company_Name, Registration_No, 
         return False
 
     try:
-        with get_connection() as conn:
+        conn = get_connection()
+        if conn is None:
+            st.error("خطأ في الاتصال بقاعدة البيانات")
+            return False
+        with conn:
             c = conn.cursor()
             c.execute('''INSERT INTO PetrolStations
                          (Station_ID, Station_Name, Company_Name, Registration_No, Opening_Year, State, City, Address, Phone, Manager_ID)
