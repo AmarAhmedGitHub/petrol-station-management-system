@@ -42,77 +42,52 @@ class AuthManager:
 
     def authenticate_user(self, username: str, password: str) -> Tuple[Optional[str], List[str]]:
         """مصادقة بيانات المستخدم"""
-        conn = get_connection()
-        if not conn:
-            return None, []
-
-        c = conn.cursor()
-
         try:
-            # فحص بيانات المدير
+            # فحص بيانات المدير أولاً (لا يحتاج قاعدة بيانات)
             if username == "admin" and password == "admin123":
                 return "Admin", ["ALL"]
 
-            # فحص بيانات المالك
-            # Prefer hashed_password column when available
-            c.execute("SELECT Contact_NO, hashed_password FROM Owners WHERE Owner_Name=%s", (username,))
-            owner = c.fetchone()
-            if owner:
-                contact_no = owner.get('Contact_NO') if isinstance(owner, dict) else owner[0]
-                hashed = owner.get('hashed_password') if isinstance(owner, dict) else owner[1]
-                if hashed:
-                    try:
-                        # verify using passlib (supports bcrypt formatted hashes)
-                        # if passlib_bcrypt.verify(password, hashed):  # تعطيل مؤقتاً
-                        if password == contact_no:  # استخدام التحقق البسيط مؤقتاً
-                            return "Owner", ["ALL"]
-                    except Exception:
-                        pass
-                else:
-                    # legacy plaintext check
-                    if password == contact_no:
-                        # migrate to hashed password using passlib
-                        try:
-                            # new_hash = passlib_bcrypt.hash(password)  # تعطيل مؤقتاً
-                            # c.execute("UPDATE Owners SET hashed_password=%s WHERE Owner_Name=%s", (new_hash, username))
-                            # conn.commit()
-                            pass
-                        except Exception:
-                            pass
-                        return "Owner", ["ALL"]
+            # محاولة الاتصال بقاعدة البيانات
+            conn = get_connection()
+            if not conn:
+                # إذا فشل الاتصال، سمح فقط بالدخول كمدير
+                if username == "admin" and password == "admin123":
+                    return "Admin", ["ALL"]
+                return None, []
 
-            # فحص بيانات الموظف
-            c.execute("SELECT Employee_ID, hashed_password FROM Employees WHERE Emp_Name=%s", (username,))
-            emp = c.fetchone()
-            if emp:
-                emp_id = emp.get('Employee_ID') if isinstance(emp, dict) else emp[0]
-                hashed_emp = emp.get('hashed_password') if isinstance(emp, dict) else emp[1]
-                if hashed_emp:
-                    try:
-                        # if passlib_bcrypt.verify(password, hashed_emp):  # تعطيل مؤقتاً
-                        if password == emp_id:  # استخدام التحقق البسيط مؤقتاً
+            with conn:
+                c = conn.cursor()
+
+                # فحص بيانات المالك
+                try:
+                    c.execute("SELECT Contact_NO, hashed_password FROM Owners WHERE Owner_Name=%s", (username,))
+                    owner = c.fetchone()
+                    if owner:
+                        contact_no = owner[0] if owner else None
+                        hashed = owner[1] if len(owner) > 1 else None
+                        if password == contact_no:  # استخدام التحقق البسيط
+                            return "Owner", ["ALL"]
+                except Exception as e:
+                    print(f"خطأ في فحص المالك: {e}")
+
+                # فحص بيانات الموظف
+                try:
+                    c.execute("SELECT Employee_ID, hashed_password FROM Employees WHERE Emp_Name=%s", (username,))
+                    emp = c.fetchone()
+                    if emp:
+                        emp_id = emp[0] if emp else None
+                        hashed_emp = emp[1] if len(emp) > 1 else None
+                        if password == emp_id:  # استخدام التحقق البسيط
                             permissions = get_user_permissions("Employee")
                             return "Employee", permissions
-                    except Exception:
-                        pass
-                else:
-                    # legacy plaintext stored in Employee_ID field
-                    if password == emp_id:
-                        # migrate to hashed password using passlib
-                        try:
-                            # new_hash = passlib_bcrypt.hash(password)  # تعطيل مؤقتاً
-                            # c.execute("UPDATE Employees SET hashed_password=%s WHERE Emp_Name=%s", (new_hash, username))
-                            # conn.commit()
-                            pass
-                        except Exception:
-                            pass
-                        permissions = get_user_permissions("Employee")
-                        return "Employee", permissions
+                except Exception as e:
+                    print(f"خطأ في فحص الموظف: {e}")
 
         except Exception as e:
-            st.error(f"خطأ في المصادقة: {e}")
-        finally:
-            conn.close()
+            print(f"خطأ عام في المصادقة: {e}")
+            # في حالة الخطأ، سمح فقط بالدخول كمدير
+            if username == "admin" and password == "admin123":
+                return "Admin", ["ALL"]
 
         return None, []
 
