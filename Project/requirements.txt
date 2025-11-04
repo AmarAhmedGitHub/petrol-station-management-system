@@ -13,6 +13,3 @@ flask>=2.3.0
 flask-cors>=4.0.0
 bcrypt>=4.0.1
 tenacity>=8.2.0
-# Additional packages for Streamlit Cloud
-mysqlclient>=2.1.0
-protobuf>=3.20.0
