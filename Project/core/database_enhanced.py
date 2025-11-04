@@ -634,6 +634,18 @@ def create_enhanced_tables():
                 FOREIGN KEY(Station_ID) REFERENCES PetrolStations(Station_ID)
             )''')
 
+            # 28b. Raw Sensor Responses (store raw API responses for troubleshooting)
+            c.execute('''CREATE TABLE IF NOT EXISTS SensorRawResponses (
+                Raw_ID INT AUTO_INCREMENT PRIMARY KEY,
+                Sensor_Type VARCHAR(20) NOT NULL,
+                Sensor_ID VARCHAR(50),
+                Tank_ID VARCHAR(10),
+                Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                Response_JSON LONGTEXT,
+                Status VARCHAR(20),
+                Notes TEXT
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4''')
+
             # 28. PTS2 Readings
             c.execute('''CREATE TABLE IF NOT EXISTS PTS2_Readings (
                 Reading_ID INT AUTO_INCREMENT PRIMARY KEY,
@@ -703,6 +715,19 @@ def create_enhanced_tables():
 
             conn.commit()
             logger.info("Enhanced database tables created successfully")
+            # Ensure hashed_password columns exist for Owners and Employees (safe migration)
+            try:
+                c.execute("ALTER TABLE Owners ADD COLUMN hashed_password VARCHAR(255) NULL")
+                logger.info("Added hashed_password to Owners")
+            except pymysql.Error as e:
+                # Column may already exist or other error; ignore if exists
+                logger.debug(f"Owners hashed_password alter result: {e}")
+
+            try:
+                c.execute("ALTER TABLE Employees ADD COLUMN hashed_password VARCHAR(255) NULL")
+                logger.info("Added hashed_password to Employees")
+            except pymysql.Error as e:
+                logger.debug(f"Employees hashed_password alter result: {e}")
     except Exception as e:
         logger.error(f"Error creating enhanced tables: {e}")
         st.error(f"خطأ في إنشاء الجداول المحسنة: {e}")
@@ -1356,6 +1381,29 @@ def record_sensor_reading(tank_id, level, sensor_type, pump_id=None):
     conn.commit()
     conn.close()
     return True
+
+
+def record_raw_sensor_response(sensor_type, sensor_id, tank_id, response_json, status='OK', notes=None):
+    """Record raw sensor API response for later troubleshooting"""
+    conn = get_connection()
+    if not conn:
+        return False
+    c = conn.cursor()
+    from datetime import datetime
+    timestamp = datetime.now()
+    try:
+        c.execute('''INSERT INTO SensorRawResponses (Sensor_Type, Sensor_ID, Tank_ID, Timestamp, Response_JSON, Status, Notes)
+                     VALUES (%s,%s,%s,%s,%s,%s,%s)''',
+                  (sensor_type, sensor_id, tank_id, timestamp, response_json, status, notes))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to record raw sensor response: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
 
 
 def record_shift_reading(employee_id, shift_id, directory_id, pump_id, tank_id, reading_type, level, notes=None):

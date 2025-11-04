@@ -1,5 +1,6 @@
 import streamlit as st
-from core.database import get_connection
+from core.database_enhanced import get_connection
+import bcrypt
 
 def show_password_reset():
     """Display password reset interface"""
@@ -123,8 +124,14 @@ def reset_password(username, user_type, security_answer, new_password):
         if user_type == "Owner":
             c.execute("SELECT City FROM Owners WHERE Owner_Name=%s", (username,))
             row = c.fetchone()
-            if row and row[0] and security_answer.strip().lower() == row[0].strip().lower():
-                c.execute("UPDATE Owners SET Contact_NO=%s WHERE Owner_Name=%s", (new_password, username))
+            city = None
+            if row:
+                # handle dict or tuple cursor
+                city = row.get('City') if isinstance(row, dict) else row[0]
+            if city and security_answer.strip().lower() == str(city).strip().lower():
+                # store hashed password
+                hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                c.execute("UPDATE Owners SET hashed_password=%s WHERE Owner_Name=%s", (hashed, username))
                 conn.commit()
                 conn.close()
                 return True, "تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول."
@@ -132,10 +139,14 @@ def reset_password(username, user_type, security_answer, new_password):
                 conn.close()
                 return False, "إجابة سؤال الأمان غير صحيحة أو المستخدم غير موجود."
         else:  # Employee
-            c.execute("SELECT City FROM Employee WHERE Emp_Name=%s", (username,))
+            c.execute("SELECT City FROM Employees WHERE Emp_Name=%s", (username,))
             row = c.fetchone()
-            if row and row[0] and security_answer.strip().lower() == row[0].strip().lower():
-                c.execute("UPDATE Employee SET Employee_ID=%s WHERE Emp_Name=%s", (new_password, username))
+            city = None
+            if row:
+                city = row.get('City') if isinstance(row, dict) else row[0]
+            if city and security_answer.strip().lower() == str(city).strip().lower():
+                hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                c.execute("UPDATE Employees SET hashed_password=%s WHERE Emp_Name=%s", (hashed, username))
                 conn.commit()
                 conn.close()
                 return True, "تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول."

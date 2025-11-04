@@ -56,7 +56,7 @@ def render_login_page():
         <style>
             [data-testid="stSidebar"] {
                 display: none;
-            }
+            }Project/main_app.py
             .main {
                 margin-left: 0 !important;
                 padding-left: 0 !important;

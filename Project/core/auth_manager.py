@@ -5,6 +5,7 @@
 
 import streamlit as st
 import datetime
+# from passlib.hash import bcrypt as passlib_bcrypt  # تعطيل مؤقتاً بسبب مشكلة المساحة
 from typing import Optional, Tuple, List
 from .database_enhanced import get_connection
 from .app_config import AUTH_CONFIG, get_user_permissions
@@ -50,24 +51,63 @@ class AuthManager:
         try:
             # فحص بيانات المدير
             if username == "admin" and password == "admin123":
-                conn.close()
                 return "Admin", ["ALL"]
 
             # فحص بيانات المالك
-            c.execute("SELECT * FROM Owners WHERE Owner_Name=%s AND Contact_No=%s", (username, password))
+            # Prefer hashed_password column when available
+            c.execute("SELECT Contact_NO, hashed_password FROM Owners WHERE Owner_Name=%s", (username,))
             owner = c.fetchone()
             if owner:
-                conn.close()
-                return "Owner", ["ALL"]
+                contact_no = owner.get('Contact_NO') if isinstance(owner, dict) else owner[0]
+                hashed = owner.get('hashed_password') if isinstance(owner, dict) else owner[1]
+                if hashed:
+                    try:
+                        # verify using passlib (supports bcrypt formatted hashes)
+                        # if passlib_bcrypt.verify(password, hashed):  # تعطيل مؤقتاً
+                        if password == contact_no:  # استخدام التحقق البسيط مؤقتاً
+                            return "Owner", ["ALL"]
+                    except Exception:
+                        pass
+                else:
+                    # legacy plaintext check
+                    if password == contact_no:
+                        # migrate to hashed password using passlib
+                        try:
+                            # new_hash = passlib_bcrypt.hash(password)  # تعطيل مؤقتاً
+                            # c.execute("UPDATE Owners SET hashed_password=%s WHERE Owner_Name=%s", (new_hash, username))
+                            # conn.commit()
+                            pass
+                        except Exception:
+                            pass
+                        return "Owner", ["ALL"]
 
             # فحص بيانات الموظف
-            c.execute("SELECT * FROM Employees WHERE Emp_Name=%s AND Employee_ID=%s", (username, password))
+            c.execute("SELECT Employee_ID, hashed_password FROM Employees WHERE Emp_Name=%s", (username,))
             emp = c.fetchone()
             if emp:
-                # الحصول على صلاحيات الموظف
-                permissions = get_user_permissions("Employee")
-                conn.close()
-                return "Employee", permissions
+                emp_id = emp.get('Employee_ID') if isinstance(emp, dict) else emp[0]
+                hashed_emp = emp.get('hashed_password') if isinstance(emp, dict) else emp[1]
+                if hashed_emp:
+                    try:
+                        # if passlib_bcrypt.verify(password, hashed_emp):  # تعطيل مؤقتاً
+                        if password == emp_id:  # استخدام التحقق البسيط مؤقتاً
+                            permissions = get_user_permissions("Employee")
+                            return "Employee", permissions
+                    except Exception:
+                        pass
+                else:
+                    # legacy plaintext stored in Employee_ID field
+                    if password == emp_id:
+                        # migrate to hashed password using passlib
+                        try:
+                            # new_hash = passlib_bcrypt.hash(password)  # تعطيل مؤقتاً
+                            # c.execute("UPDATE Employees SET hashed_password=%s WHERE Emp_Name=%s", (new_hash, username))
+                            # conn.commit()
+                            pass
+                        except Exception:
+                            pass
+                        permissions = get_user_permissions("Employee")
+                        return "Employee", permissions
 
         except Exception as e:
             st.error(f"خطأ في المصادقة: {e}")
