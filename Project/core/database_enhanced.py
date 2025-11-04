@@ -15,8 +15,9 @@ DB_CONFIG = {
     "charset": "utf8mb4"
 }
 
+@st.cache_resource(ttl=3600)
 def get_connection():
-    """Get database connection"""
+    """Get database connection with caching for Streamlit Cloud"""
     try:
         # Override DB_CONFIG with environment variables for Streamlit Cloud
         import os
@@ -26,14 +27,17 @@ def get_connection():
             "password": os.getenv("DB_PASSWORD", DB_CONFIG.get("password", "")),
             "database": os.getenv("DB_NAME", DB_CONFIG.get("database", "Petrolpump_Management_Enhanced")),
             "port": int(os.getenv("DB_PORT", DB_CONFIG.get("port", 3306))),
-            "charset": "utf8mb4"
+            "charset": "utf8mb4",
+            "autocommit": True
         }
         conn = pymysql.connect(**db_config)
         logger.debug("Database connection established successfully")
         return conn
     except pymysql.Error as err:
         logger.error(f"Database connection error: {err}")
-        st.error(f"خطأ في الاتصال بقاعدة البيانات: {err}")
+        # Don't show error in Streamlit Cloud to avoid data leaks
+        if not os.getenv("STREAMLIT_SERVER_HEADLESS", "").lower() == "true":
+            st.error(f"خطأ في الاتصال بقاعدة البيانات: {err}")
         return None
 
 # Removed duplicate get_cursor function - using context manager instead
@@ -94,7 +98,11 @@ def get_pump_meter_reading(pump_id):
 def create_enhanced_tables():
     """Create enhanced database tables with proper separation between stations and pumps"""
     try:
-        with get_connection() as conn:
+        conn = get_connection()
+        if conn is None:
+            logger.error("Failed to establish database connection")
+            return
+        with conn:
             c = conn.cursor()
             logger.info("Starting enhanced database table creation")
 
