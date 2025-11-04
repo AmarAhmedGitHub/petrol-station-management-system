@@ -827,7 +827,12 @@ def add_petrol_station(Station_ID, Station_Name, Company_Name, Registration_No, 
 def get_all_stations():
     """Get all active stations with optimized query"""
     try:
-        with get_connection() as conn:
+        conn = get_connection()
+        if conn is None:
+            logger.error("Failed to get database connection")
+            st.error("خطأ في الاتصال بقاعدة البيانات")
+            return []
+        with conn:
             c = conn.cursor()
             c.execute('SELECT * FROM PetrolStations WHERE Is_Active = TRUE ORDER BY Station_Name LIMIT 1000')
             data = c.fetchall()
