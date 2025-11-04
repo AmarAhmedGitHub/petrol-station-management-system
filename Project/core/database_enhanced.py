@@ -37,7 +37,7 @@ def get_connection():
         logger.error(f"Database connection error: {err}")
         # Don't show error in Streamlit Cloud to avoid data leaks
         if not os.getenv("STREAMLIT_SERVER_HEADLESS", "").lower() == "true":
-            st.error(f"خطأ في الاتصال بقاعدة البيانات: {err}")
+            st.error("خطأ في الاتصال بقاعدة البيانات")
         return None
 
 # Removed duplicate get_cursor function - using context manager instead
