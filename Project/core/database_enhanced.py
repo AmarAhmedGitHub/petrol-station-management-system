@@ -18,7 +18,17 @@ DB_CONFIG = {
 def get_connection():
     """Get database connection"""
     try:
-        conn = pymysql.connect(**DB_CONFIG)
+        # Override DB_CONFIG with environment variables for Streamlit Cloud
+        import os
+        db_config = {
+            "host": os.getenv("DB_HOST", DB_CONFIG.get("host", "localhost")),
+            "user": os.getenv("DB_USER", DB_CONFIG.get("user", "root")),
+            "password": os.getenv("DB_PASSWORD", DB_CONFIG.get("password", "")),
+            "database": os.getenv("DB_NAME", DB_CONFIG.get("database", "Petrolpump_Management_Enhanced")),
+            "port": int(os.getenv("DB_PORT", DB_CONFIG.get("port", 3306))),
+            "charset": "utf8mb4"
+        }
+        conn = pymysql.connect(**db_config)
         logger.debug("Database connection established successfully")
         return conn
     except pymysql.Error as err:
